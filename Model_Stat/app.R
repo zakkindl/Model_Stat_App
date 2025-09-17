@@ -42,7 +42,10 @@ ui <- fluidPage(
     mainPanel(
       
       h3("Filtered Data"),
-              DT::dataTableOutput("data_table")
+              DT::dataTableOutput("data_table"),
+      
+      h3("Filtered Data"),
+      DT::dataTableOutput("data_table_2")
       
       # Add your outputs here
       
@@ -78,16 +81,8 @@ server <- function(input, output, session) {
              ))
   })
   
-  # Filter data based on selected category AND year
-  filtered_data <- reactive({
-    req(sheet_data(), input$category_select, input$year_select)
-    
-    sheet_data() %>%
-      filter(category == input$category_select,
-             year == input$year_select)
-  })
   
-  # Player choices
+  # Player choices Select Input
   observe({
     req(sheet_data())  
     
@@ -100,7 +95,7 @@ server <- function(input, output, session) {
                       choices = player_choices)
   })
   
-  # Season Catergory
+  # Season Category Select Input
   observe({
     req(sheet_data())  
     
@@ -112,7 +107,7 @@ server <- function(input, output, session) {
                        choices = season_category)
   })
   
-  # Years
+  # Years Select Input 
   observe({
     req(sheet_data())  
     
@@ -125,7 +120,17 @@ server <- function(input, output, session) {
                       choices = years, selected = 2021)
   })
   
-  # Weeks
+  # Filter data based on selected category, year
+  filtered_data <- reactive({
+    req(sheet_data(), input$category_select, input$year_select)
+    
+    sheet_data() %>%
+      filter(category == input$category_select,
+             year == input$year_select)
+    
+  })
+  
+  # Weeks Select Input based on season category selected
   observe({
     req(filtered_data())  
     
@@ -141,27 +146,66 @@ server <- function(input, output, session) {
                       choices = available_weeks)
   })
   
-  # Filtered data for weeks
-  model_data <- reactive({
+  # Filtered data for comparison weeks selected
+  table_data <- reactive({
     req(sheet_data(), input$category_select, input$year_select, 
         input$week_one_select, input$week_two_select)
     
     sheet_data() %>%
       filter(category == input$category_select,
              year == input$year_select,
+             athletes == input$player_select,
              week >= min(input$week_one_select, input$week_two_select),
              week <= max(input$week_one_select, input$week_two_select))
+  })
+
+  
+  timepoint_1 <- reactive({
+    req(table_data(), input$week_one_select)
+    
+    table_data() |>
+      filter(week == input$week_one_select,
+             assessment == "CMJ (Force Plates)") |>  
+      select(athletes, date, assessment, metric, value, week) |>
+      group_by(metric, date) |>  
+      summarise(mean_value = mean(value, na.rm = TRUE),
+                athletes = first(athletes),
+                assessment = first(assessment),
+                week = first(week),
+                .groups = 'drop') 
+  })
+  
+  timepoint_2 <- reactive({
+    req(table_data(), input$week_two_select)
+    
+    table_data() |>
+      filter(week == input$week_two_select,
+             assessment == "CMJ (Force Plates)") |>  
+      select(athletes, date, assessment, metric, value, week) |>
+      group_by(metric, date) |>  
+      summarise(mean_value = mean(value, na.rm = TRUE),
+                athletes = first(athletes),
+                assessment = first(assessment),
+                week = first(week),
+                .groups = 'drop')
   })
   
   # Data table output
   output$data_table <- DT::renderDataTable({
-    req(model_data())
-    
-    model_data()
+    timepoint_2()
   }, options = list(
     pageLength = 10,
     scrollX = TRUE
   ))
+  
+  # Data table output
+  output$data_table_2 <- DT::renderDataTable({
+    timepoint_2()
+  }, options = list(
+    pageLength = 10,
+    scrollX = TRUE
+  ))
+  
   
 }
 
