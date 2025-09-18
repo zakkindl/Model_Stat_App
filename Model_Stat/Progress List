@@ -1,6 +1,10 @@
 
-
-
 Create seperate data frame for data that won't matter like anthropometrey, age, laterality
 
-Create model stat method grouping by exercises 
+Create model stat method grouping by exercises from filtered data option
+
+Create main plot output, interactive with plotly 
+
+Either longitudinal view of data underneath or data table with filtered values? 
+
+Add save/export button
