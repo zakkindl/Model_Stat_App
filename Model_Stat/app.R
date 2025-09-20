@@ -13,7 +13,7 @@ ui <- grid_page(
   ),
   row_sizes = c(
     "80px",
-    "1.5fr",
+    "1fr",
     "1fr"
   ),
   col_sizes = c(
@@ -23,12 +23,13 @@ ui <- grid_page(
   ),
   gap_size = "1rem",
   
-  # Header
-  grid_card_text(
+  #Header
+  grid_card(
     area = "header",
-    content = "Model Statistic & CV Dashboard",
-    alignment = "center",
-    is_title = TRUE
+    card_body(
+      h1("Model Statistic & CV Dashboard", 
+         style = "font-weight: bold; text-align: left; margin: 0; padding: 10px;")
+    )
   ),
   
   # Sidebar with controls
@@ -70,7 +71,7 @@ ui <- grid_page(
   # Table area
   grid_card(
     area = "table",
-    card_header("Comparison Data"),
+    card_header("Week by Week"),
     card_body(
       DTOutput("comparison_data")
     )
@@ -249,7 +250,7 @@ server <- function(input, output, session) {
   })
   
   # Data table output
-  output$comparison_data <- renderDT({
+  output$comparison_data <- renderDT({  
     comparison_data()
   }, options = list(
     pageLength = 8,
@@ -279,7 +280,8 @@ server <- function(input, output, session) {
               hovertemplate = paste0("<b>%{x}</b><br>",
                                      "Change: %{y:.1f}%<br>",
                                      "<extra></extra>")) %>%
-      layout(title = paste0("CMJ Metrics Week ",input$week_one_select, " to Week ", input$week_two_select),
+      layout(title = paste0("CMJ Metrics Week ",
+                            input$week_one_select, " to Week ", input$week_two_select),
              xaxis = list(title = ""),
              yaxis = list(title = "Percent Change (%)"),
              legend = list(title = "Change Type"),
