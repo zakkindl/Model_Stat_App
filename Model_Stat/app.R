@@ -1,32 +1,52 @@
 # Load packages
-packages <- c('shiny','tidyverse','googlesheets4','shinycssloaders','DT','plotly')
-
+packages <- c('shiny','tidyverse','googlesheets4','shinycssloaders','DT','plotly','gridlayout','bslib')
 lapply(packages, library, character.only = TRUE)
 
-
-##### Start UI ####
-
-ui <- fluidPage(
-  # App title 
-  titlePanel("Model Statistic Dashboard"),
+##### Grid Layout UI ####
+ui <- grid_page(
+  theme = bs_theme(base_font = "Helvetica Neue"),
   
-  #### Sidebar ####
+  layout = c(
+    "header  header   header  ",
+    "sidebar plot     plot    ",
+    "sidebar table    table   "
+  ),
+  row_sizes = c(
+    "80px",
+    "1.5fr",
+    "1fr"
+  ),
+  col_sizes = c(
+    "300px",
+    "1fr",
+    "1fr"
+  ),
+  gap_size = "1rem",
   
-  sidebarLayout(
-
-        sidebarPanel(
-      
+  # Header
+  grid_card_text(
+    area = "header",
+    content = "Model Statistic & CV Dashboard",
+    alignment = "center",
+    is_title = TRUE
+  ),
+  
+  # Sidebar with controls
+  grid_card(
+    area = "sidebar",
+    card_header("Settings"),
+    card_body(
       selectInput("player_select", 
                   "Choose Player:",
                   choices = "Loading..."),
       
       radioButtons("category_select",
-                  "Category:",
-                  choices = "Loading..."),
+                   "Category:",
+                   choices = "Loading..."),
       
       selectInput("year_select",
-                   "Year:",
-                   choices = "Loading..."),
+                  "Year:",
+                  choices = "Loading..."),
       
       selectInput("week_one_select",
                   "Select First Week",
@@ -35,35 +55,33 @@ ui <- fluidPage(
       selectInput("week_two_select",
                   "Select Second Week",
                   choices = "Loading...")
-      
-    ),
-    
- #### Main Panel ####   
-    mainPanel(
-      
+    )
+  ),
+  
+  # Plot area
+  grid_card(
+    area = "plot",
+    card_header("Performance Changes"),
+    card_body(
       plotlyOutput("plotly_plot")
-      
-      # h3("First Week"),
-      #         DT::dataTableOutput("data_table"),
-      # 
-      # h3("Second Week"),
-      # DT::dataTableOutput("data_table_2"),
-      # 
-      # h3("Compared Week"),
-      # DT::dataTableOutput("comparison_data")
-      
-      # Add your outputs here
-      
+    )
+  ),
+  
+  # Table area
+  grid_card(
+    area = "table",
+    card_header("Comparison Data"),
+    card_body(
+      DTOutput("comparison_data")
     )
   )
 )
 
 #### Server ####
-
 server <- function(input, output, session) {  
   
   # Show loading message while imported data loads from sheet
-  showNotification("Loading data...", type = "message", duration = 2, id = "loading")
+  showNotification("Loading data...", type = "message", duration = 3, id = "loading")
   
   # Import data from public googlesheet
   sheet_data <- reactive({
@@ -85,7 +103,6 @@ server <- function(input, output, session) {
                TRUE ~ NA_character_
              ))
   })
-  
   
   # Player choices Select Input
   observe({
@@ -132,7 +149,6 @@ server <- function(input, output, session) {
     sheet_data() %>%
       filter(category == input$category_select,
              year == input$year_select)
-    
   })
   
   # Weeks filtered based on season selected
@@ -164,7 +180,7 @@ server <- function(input, output, session) {
              week <= max(input$week_one_select, input$week_two_select))
   })
   
-#Timepoint 1
+  # Timepoint 1
   timepoint_1 <- reactive({
     req(table_data(), input$week_one_select)
     
@@ -181,15 +197,7 @@ server <- function(input, output, session) {
                 .groups = 'drop') 
   })
   
-  # Data table output 1
-  output$data_table <- DT::renderDataTable({
-    timepoint_1()
-  }, options = list(
-    pageLength = 10,
-    scrollX = TRUE
-  ))
-  
-#Timepoint 2
+  # Timepoint 2
   timepoint_2 <- reactive({
     req(table_data(), input$week_two_select)
     
@@ -206,17 +214,7 @@ server <- function(input, output, session) {
                 .groups = 'drop')
   })
   
-
-  # Data table output 2
-  output$data_table_2 <- DT::renderDataTable({
-    timepoint_2()
-  }, options = list(
-    pageLength = 10,
-    scrollX = TRUE
-  ))
-  
-  
-#Comparison Data
+  # Comparison Data
   comparison_data <- reactive({
     req(timepoint_1(), timepoint_2())
     
@@ -243,30 +241,31 @@ server <- function(input, output, session) {
         percent_change = first(((mean_t2 - mean_t1) / mean_t1) * 100),
         critical_diff = first(sd_mean*1.3733),
         model_stat_significance = case_when(abs_mean_diff > critical_diff ~ "significant_diff",
-                                 abs_mean_diff <= critical_diff ~ "non-significant_diff"),
-        cv = sd_t1/mean_t1,
-        cv_significance = case_when(percent_change>cv ~ "true_difference",
-                                    percent_change<=cv ~ "trivial_difference"),
-      .groups = 'drop')
+                                            abs_mean_diff <= critical_diff ~ "non-significant_diff"),
+        cv = first(sd_t1/mean_t1)*100,
+        cv_significance = case_when(abs(percent_change) > cv ~ "true_difference",
+                                    abs(percent_change) <= cv ~ "trivial_difference"),
+        .groups = 'drop')
   })
   
-  
-  output$comparison_data <- DT::renderDataTable({
+  # Data table output
+  output$comparison_data <- renderDT({
     comparison_data()
   }, options = list(
-    pageLength = 10,
+    pageLength = 8,
     scrollX = TRUE
   ))
   
+  # Plotly output
   output$plotly_plot <- renderPlotly({
-    req(comparison_data())
+    req(comparison_data(), input$week_one_select, input$week_two_select)
     
     plot_data <- comparison_data() %>%
       mutate(color_group = case_when(
-        significance == "non-significant_diff" ~ "Non-Significant",
-        significance == "significant_diff" & percent_change < 0 ~ "Significant Decrease",
-        significance == "significant_diff" & percent_change > 0 ~ "Significant Increase",
-        TRUE ~ "Non-significant"
+        model_stat_significance == "non-significant_diff" ~ "Non-Significant",
+        model_stat_significance == "significant_diff" & percent_change < 0 ~ "Significant Decrease",
+        model_stat_significance == "significant_diff" & percent_change > 0 ~ "Significant Increase",
+        TRUE ~ "Non-Significant"
       ))
     
     p <- plot_data %>%
@@ -277,19 +276,16 @@ server <- function(input, output, session) {
                          "Significant Decrease" = "red", 
                          "Significant Increase" = "darkgreen"),
               type = "bar",
-              text = ~paste("<br>Change:", round(percent_change, 2), "%")) %>%
+              hovertemplate = paste0("<b>%{x}</b><br>",
+                                     "Change: %{y:.1f}%<br>",
+                                     "<extra></extra>")) %>%
       layout(title = paste0("CMJ Metrics Week ",input$week_one_select, " to Week ", input$week_two_select),
              xaxis = list(title = ""),
              yaxis = list(title = "Percent Change (%)"),
              legend = list(title = "Change Type"),
              font = list(family = "Helvetica Neue"))
     p
-    
-    
   })
-  
-  
-  
 }
 
 shinyApp(ui = ui, server = server)
