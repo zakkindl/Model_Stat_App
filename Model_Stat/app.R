@@ -220,7 +220,7 @@ server <- function(input, output, session) {
   comparison_data <- reactive({
     req(timepoint_1(), timepoint_2())
     
-    # Join the two datasets by metric
+    # Join the two data sets by metric
     timepoint_1() |>
       select(metric, mean_value,sd_value, week, date) |>
       rename(mean_t1 = mean_value,
@@ -242,10 +242,14 @@ server <- function(input, output, session) {
         sd_mean = first(((sd_t1^2 + sd_t2^2)/2)^.5),
         percent_change = first(((mean_t2 - mean_t1) / mean_t1) * 100),
         critical_diff = first(sd_mean*1.3733),
-        significance = case_when(abs_mean_diff > critical_diff ~ "significant_diff",
+        model_stat_significance = case_when(abs_mean_diff > critical_diff ~ "significant_diff",
                                  abs_mean_diff <= critical_diff ~ "non-significant_diff"),
+        cv = sd_t1/mean_t1,
+        cv_significance = case_when(percent_change>cv ~ "true_difference",
+                                    percent_change<=cv ~ "trivial_difference"),
       .groups = 'drop')
   })
+  
   
   output$comparison_data <- DT::renderDataTable({
     comparison_data()
