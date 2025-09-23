@@ -263,9 +263,9 @@ server <- function(input, output, session) {
     
     plot_data <- comparison_data() %>%
       mutate(color_group = case_when(
-        model_stat_significance == "non-significant_diff" ~ "Non-Significant",
-        model_stat_significance == "significant_diff" & percent_change < 0 ~ "Significant Decrease",
-        model_stat_significance == "significant_diff" & percent_change > 0 ~ "Significant Increase",
+        model_stat_significance == "non-significant_diff" & cv_significance == "trivial_difference" ~ "Non-Significant",
+        model_stat_significance == "significant_diff" & percent_change < 0 & cv_significance == "true_difference" ~ "Significant Decrease",
+        model_stat_significance == "significant_diff" & percent_change > 0 & cv_significance == "true_difference" ~ "Significant Increase",
         TRUE ~ "Non-Significant"
       ))
     
@@ -277,8 +277,16 @@ server <- function(input, output, session) {
                          "Significant Decrease" = "red", 
                          "Significant Increase" = "darkgreen"),
               type = "bar",
+              error_y = list(
+                type = "data",
+                array = ~cv,
+                color = "black",
+                thickness = 2,
+                width = 3
+              ),
               hovertemplate = paste0("<b>%{x}</b><br>",
                                      "Change: %{y:.1f}%<br>",
+                                     "CV: %{error_y.array:.1f}%<br>",
                                      "<extra></extra>")) %>%
       layout(title = paste0("CMJ Metrics Week ",
                             input$week_one_select, " to Week ", input$week_two_select),
