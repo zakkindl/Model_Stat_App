@@ -1,5 +1,5 @@
 # Load packages
-packages <- c('shiny','tidyverse','googlesheets4','shinycssloaders','DT','plotly','gridlayout','bslib')
+packages <- c('shiny','tidyverse','googlesheets4','shinycssloaders','DT','plotly','gridlayout','bslib','gt')
 lapply(packages, library, character.only = TRUE)
 
 ##### Grid Layout UI ####
@@ -73,7 +73,7 @@ ui <- grid_page(
     area = "table",
     card_header("Week by Week"),
     card_body(
-      DTOutput("comparison_data")
+      gt_output("comparison_data")
     )
   )
 )
@@ -249,13 +249,22 @@ server <- function(input, output, session) {
         .groups = 'drop')
   })
   
-  # Data table output
-  output$comparison_data <- renderDT({  
-    comparison_data()
-  }, options = list(
-    pageLength = 8,
-    scrollX = TRUE
-  ))
+  
+  output$comparison_data <- render_gt({  
+    comparison_data() %>%
+      gt() %>%
+      cols_label(
+        metric = "Performance Metric",
+        percent_change = "Percent Change (%)",
+        model_stat_significance = "Significance",
+        cv = "Coefficient of Variation",
+        cv_significance = "Practical Significance"
+      ) %>%
+      fmt_number(
+        columns = c(percent_change, cv),
+        decimals = 1
+      )
+  })
   
   # Plotly output
   output$plotly_plot <- renderPlotly({
