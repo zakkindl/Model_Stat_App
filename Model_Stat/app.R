@@ -23,7 +23,7 @@ ui <- grid_page(
   ),
   gap_size = "1rem",
   
-  #Header
+  #Header####
   grid_card(
     area = "header",
     card_body(
@@ -32,7 +32,7 @@ ui <- grid_page(
     )
   ),
   
-  # Sidebar with controls
+  # Sidebar ####
   grid_card(
     area = "sidebar",
     card_header("Settings"),
@@ -59,7 +59,7 @@ ui <- grid_page(
     )
   ),
   
-  # Plot area
+  # Plot area####
   grid_card(
     area = "plot",
     card_header("Performance Changes"),
@@ -68,7 +68,7 @@ ui <- grid_page(
     )
   ),
   
-  # Table area
+  # Table area####
   grid_card(
     area = "table",
     card_header("Week by Week"),
@@ -105,7 +105,7 @@ server <- function(input, output, session) {
              ))
   })
   
-  # Player choices Select Input
+  # Player choices Select Input####
   observe({
     req(sheet_data())  
     
@@ -118,7 +118,7 @@ server <- function(input, output, session) {
                       choices = player_choices)
   })
   
-  # Season Category Select Input
+  # Season Category Select Input####
   observe({
     req(sheet_data())  
     
@@ -130,7 +130,7 @@ server <- function(input, output, session) {
                        choices = season_category)
   })
   
-  # Years Select Input 
+  # Years Select Input ####
   observe({
     req(sheet_data())  
     
@@ -215,7 +215,7 @@ server <- function(input, output, session) {
                 .groups = 'drop')
   })
   
-  # Comparison Data
+  # Comparison Data####
   comparison_data <- reactive({
     req(timepoint_1(), timepoint_2())
     
@@ -249,24 +249,27 @@ server <- function(input, output, session) {
         .groups = 'drop')
   })
   
-  
+  # Table Output ####
   output$comparison_data <- render_gt({  
-    comparison_data() %>%
-      gt() %>%
+    comparison_data()  |> 
+      gt() |> 
       cols_label(
         metric = "Performance Metric",
         percent_change = "Percent Change (%)",
         model_stat_significance = "Significance",
         cv = "Coefficient of Variation",
-        cv_significance = "Practical Significance"
-      ) %>%
+        cv_significance = "Practical Significance",
+        abs_mean_diff =	"Abs Mean Difference",
+        sd_mean = "SD Mean",
+        critical_diff = "Critical Difference"
+      ) |> 
       fmt_number(
-        columns = c(percent_change, cv),
+        columns = c(percent_change, cv,abs_mean_diff,sd_mean,critical_diff),
         decimals = 1
       )
   })
   
-  # Plotly output
+  # Plotly output####
   output$plotly_plot <- renderPlotly({
     req(comparison_data(), input$week_one_select, input$week_two_select)
     
@@ -291,7 +294,8 @@ server <- function(input, output, session) {
                 array = ~cv,
                 color = "black",
                 thickness = 2,
-                width = 3
+                width = 3,
+                symmetric = TRUE
               ),
               hovertemplate = paste0("<b>%{x}</b><br>",
                                      "Change: %{y:.1f}%<br>",
