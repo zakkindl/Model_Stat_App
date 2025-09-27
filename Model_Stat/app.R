@@ -2,7 +2,7 @@
 packages <- c('shiny','tidyverse','googlesheets4','shinycssloaders','DT','plotly','gridlayout','bslib','gt')
 lapply(packages, library, character.only = TRUE)
 
-##### Grid Layout UI ####
+# UI Layout ####
 ui <- grid_page(
   theme = bs_theme(base_font = "Helvetica Neue"),
   
@@ -23,7 +23,7 @@ ui <- grid_page(
   ),
   gap_size = "1rem",
   
-  #Header####
+## Header ####
   grid_card(
     area = "header",
     card_body(
@@ -32,7 +32,7 @@ ui <- grid_page(
     )
   ),
   
-  # Sidebar ####
+  ### Sidebar ####
   grid_card(
     area = "sidebar",
     card_header("Settings"),
@@ -59,7 +59,7 @@ ui <- grid_page(
     )
   ),
   
-  # Plot area####
+  ### Plot area ####
   grid_card(
     area = "plot",
     card_header("Performance Changes"),
@@ -68,13 +68,12 @@ ui <- grid_page(
     )
   ),
   
-  # Table area####
+  ### Table/Tab area####
   grid_card(
     area = "table",
     card_header("Data"),
     card_body(
       tabsetPanel(
-        
         
         tabPanel("Initial Week", 
                  gt_output("intial_week_table")),
@@ -89,11 +88,13 @@ ui <- grid_page(
   )
 )
 
-#### Server ####
+
 server <- function(input, output, session) {  
   
   # Show loading message while imported data loads from sheet
   showNotification("Loading data...", type = "message", duration = 3, id = "loading")
+  
+  # Import Data ####
   
   # Import data from public googlesheet
   sheet_data <- reactive({
@@ -115,8 +116,8 @@ server <- function(input, output, session) {
                TRUE ~ NA_character_
              ))
   })
-  
-  # Player choices Select Input####
+  # Select Inputs ####
+  ## Player Select Input####
   observe({
     req(sheet_data())  
     
@@ -129,7 +130,7 @@ server <- function(input, output, session) {
                       choices = player_choices)
   })
   
-  # Season Category Select Input####
+  ## Season Select Input####
   observe({
     req(sheet_data())  
     
@@ -141,7 +142,7 @@ server <- function(input, output, session) {
                        choices = season_category)
   })
   
-  # Years Select Input ####
+  ## Year Select Input ####
   observe({
     req(sheet_data())  
     
@@ -154,6 +155,9 @@ server <- function(input, output, session) {
                       choices = years, selected = 2021)
   })
   
+  # Filtered Data ####
+  
+  ## Category & Year ####
   # Filter data based on selected category, year
   filtered_data <- reactive({
     req(sheet_data(), input$category_select, input$year_select)
@@ -162,7 +166,7 @@ server <- function(input, output, session) {
       filter(category == input$category_select,
              year == input$year_select)
   })
-  
+  ## Week Select Input ####
   # Weeks filtered based on season selected
   observe({
     req(filtered_data())  
@@ -173,10 +177,10 @@ server <- function(input, output, session) {
       sort()
     
     updateSelectInput(session, "week_one_select", 
-                      choices = available_weeks)
+                      choices = available_weeks,selected = 8)
     
     updateSelectInput(session, "week_two_select", 
-                      choices = available_weeks)
+                      choices = available_weeks, selected = 9)
   })
   
   # Filtered data for comparing weeks selected
@@ -192,7 +196,7 @@ server <- function(input, output, session) {
              week <= max(input$week_one_select, input$week_two_select))
   })
   
-  # Timepoint 1
+  ## Timepoint 1 Data ####
   timepoint_1 <- reactive({
     req(table_data(), input$week_one_select)
     
@@ -208,14 +212,17 @@ server <- function(input, output, session) {
                 week = first(week),
                 .groups = 'drop') 
   })
-  
+  ### Timepoint 1 Table ####
   timepoint_1_table <- reactive({
     req(timepoint_1())
     
-    timepoint_1() 
+    timepoint_1() |> select(
+      metric, date, mean_value,sd_value
+    )
+    
   })
   
-  # Timepoint 2
+## Timepoint 2 Data ####
   timepoint_2 <- reactive({
     req(table_data(), input$week_two_select)
     
@@ -232,7 +239,17 @@ server <- function(input, output, session) {
                 .groups = 'drop')
   })
   
-  # Comparison Data####
+  ### Timepoint 2 Table ####
+  timepoint_2_table <- reactive({
+    req(timepoint_2())
+    
+    timepoint_2() |> select(
+      metric, date, mean_value,sd_value
+    )
+    
+  })
+  
+  # Comparison Data ####
   comparison_data <- reactive({
     req(timepoint_1(), timepoint_2())
     
@@ -258,55 +275,76 @@ server <- function(input, output, session) {
         sd_mean = first(((sd_t1^2 + sd_t2^2)/2)^.5),
         percent_change = first(((mean_t2 - mean_t1) / mean_t1) * 100),
         critical_diff = first(sd_mean*1.3733),
-        model_stat_significance = case_when(abs_mean_diff > critical_diff ~ "significant_diff",
-                                            abs_mean_diff <= critical_diff ~ "non-significant_diff"),
+        model_stat_significance = case_when(abs_mean_diff > critical_diff ~ "Significant Difference",
+                                            abs_mean_diff <= critical_diff ~ "Non-Significant Difference"),
         cv = first(sd_t1/mean_t1)*100,
-        cv_significance = case_when(abs(percent_change) > cv ~ "true_difference",
-                                    abs(percent_change) <= cv ~ "trivial_difference"),
+        cv_significance = case_when(abs(percent_change) > cv ~ "True Difference",
+                                    abs(percent_change) <= cv ~ "Trivial Difference"),
         .groups = 'drop')
   })
   
-  # Initial Week Output ####
+  #Outputs ####
+  
+  ## Initial Week Output ####
   
   output$intial_week_table <- render_gt({
-    timepoint_1_table()
+    timepoint_1_table()|> 
+      gt() |> 
+      cols_label(
+        metric = "Performance Metric",
+        date = "Date",
+        mean_value = "Mean Value",
+        sd_value = "SD Value"
+      ) |>
+      fmt_number(
+        columns = c(mean_value,sd_value),
+        decimals = 2
+      )
   })
   
-  # Secondary Week Output ####
+  ## Secondary Week Output ####
   
   output$secondary_week_table <- render_gt({
-    timepoint_2()
+    timepoint_2_table() |> 
+      gt() |> 
+      cols_label(
+        metric = "Performance Metric",
+        date = "Date",
+        mean_value = "Mean Value",
+        sd_value = "SD Value"
+      )|>
+      fmt_number(
+        columns = c(mean_value,sd_value),
+        decimals = 2
+      )
   })
   
-  # Summary Table Output ####
+  ## Comparisson Table Output ####
   output$comparison_data <- render_gt({  
     comparison_data()  |> 
+      select(metric,abs_mean_diff,percent_change,cv) |> 
       gt() |> 
       cols_label(
         metric = "Performance Metric",
         percent_change = "Percent Change (%)",
-        model_stat_significance = "Significance",
         cv = "Coefficient of Variation",
-        cv_significance = "Practical Significance",
         abs_mean_diff =	"Abs Mean Difference",
-        sd_mean = "SD Mean",
-        critical_diff = "Critical Difference"
       ) |> 
       fmt_number(
-        columns = c(percent_change, cv,abs_mean_diff,sd_mean,critical_diff),
+        columns = c(percent_change, cv,abs_mean_diff),
         decimals = 1
       )
   })
   
-  # Plotly output####
+  ## Plotly output####
   output$plotly_plot <- renderPlotly({
     req(comparison_data(), input$week_one_select, input$week_two_select)
     
     plot_data <- comparison_data() %>%
       mutate(color_group = case_when(
-        model_stat_significance == "non-significant_diff" & cv_significance == "trivial_difference" ~ "Non-Significant",
-        model_stat_significance == "significant_diff" & percent_change < 0 & cv_significance == "true_difference" ~ "Significant Decrease",
-        model_stat_significance == "significant_diff" & percent_change > 0 & cv_significance == "true_difference" ~ "Significant Increase",
+        model_stat_significance == "Non-Significant Difference" & cv_significance == "Trivial Difference" ~ "Non-Significant",
+        model_stat_significance == "Significant Difference" & percent_change < 0 & cv_significance == "True Difference" ~ "Significant Decrease",
+        model_stat_significance == "Significant Difference" & percent_change > 0 & cv_significance == "True Difference" ~ "Significant Increase",
         TRUE ~ "Non-Significant"
       ))
     
