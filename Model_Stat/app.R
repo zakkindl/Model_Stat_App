@@ -71,9 +71,20 @@ ui <- grid_page(
   # Table area####
   grid_card(
     area = "table",
-    card_header("Week by Week"),
+    card_header("Data"),
     card_body(
-      gt_output("comparison_data")
+      tabsetPanel(
+        
+        
+        tabPanel("Initial Week", 
+                 gt_output("intial_week_table")),
+        
+        tabPanel("Secondary Week", 
+                 gt_output("secondary_week_table")),
+        
+        tabPanel("Comparison Data", 
+                 gt_output("comparison_data"))
+    )
     )
   )
 )
@@ -198,6 +209,12 @@ server <- function(input, output, session) {
                 .groups = 'drop') 
   })
   
+  timepoint_1_table <- reactive({
+    req(timepoint_1())
+    
+    timepoint_1() 
+  })
+  
   # Timepoint 2
   timepoint_2 <- reactive({
     req(table_data(), input$week_two_select)
@@ -249,7 +266,19 @@ server <- function(input, output, session) {
         .groups = 'drop')
   })
   
-  # Table Output ####
+  # Initial Week Output ####
+  
+  output$intial_week_table <- render_gt({
+    timepoint_1_table()
+  })
+  
+  # Secondary Week Output ####
+  
+  output$secondary_week_table <- render_gt({
+    timepoint_2()
+  })
+  
+  # Summary Table Output ####
   output$comparison_data <- render_gt({  
     comparison_data()  |> 
       gt() |> 
